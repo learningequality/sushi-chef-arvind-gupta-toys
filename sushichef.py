@@ -7,6 +7,8 @@ import requests
 import urllib
 import json
 import youtube_dl
+import uuid
+import re
 
 from bs4 import BeautifulSoup
 from copy import copy
@@ -14,187 +16,248 @@ from copy import copy
 from ricecooker.chefs import SushiChef
 from ricecooker.classes.files import VideoFile
 from ricecooker.classes.licenses import get_license
-from ricecooker.classes.nodes import ChannelNode, VideoNode
+from ricecooker.classes.nodes import ChannelNode, VideoNode, TopicNode
+
+from le_utils.constants.languages import getlang_by_name
 
 from arvind import ArvindVideo
 
 
-AVIND_URL = "http://www.arvindguptatoys.com/films.html"
+LE = 'Learning Equality'
+
+ARVIND = "Arvind Gupta Toys"
+
+ARVIND_URL = "http://www.arvindguptatoys.com/films.html"
 
 DOWNLOADS_PATH = os.path.join(os.getcwd(), "downloads")
 DOWNLOADS_VIDEOS_PATH = os.path.join(DOWNLOADS_PATH, "videos/")
 
-TEMP_HTML_FILE = os.path.join(DOWNLOADS_PATH, "temp/web.html")
+# These are the laguages that has no sub topics on its contents.
+SINGLE_TOPIC_LANGUAGES = [
+    "bhojpuri", "nepali", "malayalam", "telugu", "bengali", \
+    "odiya", "punjabi", "marwari", "assamese", "urdu", \
+     "spanish", "chinese", "indonesian", "sci_edu"
+    ]
+
+# List of multiple languages on its sub topics
+MULTI_LANGUAGE_TOPIC = ["russian", "french",]
+
+# List of languages not avialble at the le_utils
+UND_LANG = ["marwari", "bhojpuri", "odiya"]
+
+# This are the estimate total count of languages
+TOTAL_ARVIND_LANG = 25
 
 
-def create_language_data(lang_data):
+def get_lang_obj(lang_name):
+    language_obj = None
+    if lang_name:
+        lang_name = lang_name.lower()
+        language_obj = getlang_by_name(lang_name)
+        if not language_obj:
+            print("language not in le-utils laguages", lang_name)
+    return language_obj
+
+
+def clean_video_title(title, lang_obj):
+    # Remove redundant and misleading words in the video title
+    clean_title = title
+    if title != None:
+        clean_str = title.replace("-", "").replace("MB", "")
+        clean_lang = clean_str.replace(lang_obj.name.upper(), "")
+        clean_format = clean_lang.replace(".avi", "").replace(".wmv", "")
+        clean_title = re.sub(r'\d+', '', clean_format)
+        print("=====> clean title", clean_title)
+    return clean_title
+
+
+def include_video_topic(topic_node, video_data, lang_obj):
+    video = video_data
+    create_id = uuid.uuid4().hex[:6].lower()
+    video_source_id = create_id + str(video.uid) 
+    video_node = VideoNode(
+        source_id=video.uid, 
+        title=clean_video_title(video.title, lang_obj), 
+        description=video.description,
+        aggregator=LE,
+        thumbnail=video.thumbnail,
+        license=get_license("CC BY-NC", copyright_holder=ARVIND),
+        files=[
+            VideoFile(
+                path=video.filepath,
+                language=lang_obj.code
+            )
+        ])
+    topic_node.add_child(video_node)
+
+
+def download_video_topics(data, topic, topic_node, lang_obj):
+    """
+    Scrape, collect, and download the videos and their thumbnails.
+    """
+    pp = pprint.PrettyPrinter()
+
+    for vinfo in data[topic]:
+        try:
+            video = ArvindVideo(
+                url=vinfo['video_url'], 
+                title=vinfo['video_title'], 
+                language='english',
+                filename_prefix=vinfo['filename_prefix'])
+            print('==> DOWNLOADING', vinfo['video_url'])
+
+            download_path = vinfo['download_path'] + "/" + topic + "/"
+            if video.download(download_dir=download_path):
+                include_video_topic(topic_node, video, lang_obj)
+
+        except Exception as e:
+            print('Error downloading videos:')
+            pp.pprint(e)
+
+
+def generate_child_topics(arvind_contents, main_topic, lang_obj):
+
+    pp = pprint.PrettyPrinter()
+    data = arvind_contents[lang_obj.name]
+    for topic in data:
+        print("======> Language topic", topic)
+        source_id = topic + lang_obj.code
+        topic_node = TopicNode(title=topic, source_id=source_id)
+
+        download_video_topics(data, topic, topic_node, lang_obj)
+        main_topic.add_child(topic_node)
+
+    return main_topic
+
+
+def create_language_data(lang_data, lang_obj):
     # Todo clean up this function
     pp = pprint.PrettyPrinter()
     topic_contents = {}
     initial_topics = []
-
     prev_topic = ""
-
     counter = 1
+    topic_limit = 0
     total_loop = len(lang_data)
-    for i in lang_data:
+    # pp.pprint(lang_data)
+    for item in lang_data:
         total_loop -= 1
         try:
-            title = i.text.rstrip().strip()
+            title = item.text.rstrip().strip()
             # pp.pprint(title)
-
-            vid_link = ""
-            
+            video_link = ""
+            download_path = DOWNLOADS_VIDEOS_PATH + lang_obj.name
             try:
-                vid_link = i.a.get("href")
-                link_details = {}
-                link_details['video_link'] = vid_link
-                link_details['video_title'] = title
-                initial_topics.append(link_details)
-                # return
+                video_link = item.a.get("href")
+                topic_details = {}
+                ytd_domain = "youtube.com"
+                if ytd_domain in video_link:
+                    topic_details['video_url'] = video_link
+                    topic_details['video_title'] = title
+                    topic_details['filename_prefix'] = 'arvind-video-'
+                    topic_details['download_path'] = download_path
+                    if topic_limit != 1:
+                        topic_limit += 1
+                        initial_topics.append(topic_details)
             except:
-                # pp.pprint(i.strip())
                 pass
-
             if counter == 1:
                 if ":" in title:
                     counter = 0
-                    prev_topic = title
+                    prev_topic = title.replace(":", "").strip()
 
-            if vid_link == "":
+            if video_link == "":
                 if ":" in title:
                     topic_contents[prev_topic] = initial_topics
-                    prev_topic = title
+                    prev_topic = title.replace(":", "").strip()
                     initial_topics = []
-                    pp.pprint(title)
-            
-            pass
+                    topic_limit = 0
+                    # pp.pprint(title)
+
         except:
-            # pp.pprint(i.strip())
             pass
 
         if total_loop == 0:
             topic_contents[prev_topic] = initial_topics
     return topic_contents
 
-def scrape_page(url):
+
+def scrape_arvind_page():
+    url = ARVIND_URL
     pp = pprint.PrettyPrinter()
 
-    # TODO: check if local html file exist if not create it
-    # Online scrape
     response = requests.get(url)
     page = BeautifulSoup(response.text, 'html5lib')
-
-    # if not os.path.exists(TEMP_HTML_FILE):
-    #     file = open(TEMP_HTML_FILE, "w") 
-    #     file.write(page.prettify())
-    #     file.close() 
-
-    # Offline scrape
-    # response = urllib.request.urlopen(LOCAL_HTML_PATH)
-    # page = BeautifulSoup(response, 'html5lib')
-
     content_divs = page.body.div
 
     list_divs = list(content_divs.children)
     language_divs = list(list_divs[5].children)
     # language divs is a list of language just
 
-    # To get the first language append four to the language counter
-    language_counter = 7
-    get_language = list(language_divs[language_counter])
-    # create_language_data(get_language)
-    # pp.pprint(list(language_divs)[7])
-    lang_name = language_divs[language_counter].get('id')
-    data_contents = { lang_name: create_language_data(get_language) }
+    return language_divs
+
+
+def create_languages_topic():
+    arvind_languages = scrape_arvind_page()
+    pp = pprint.PrettyPrinter()
+    main_topic_list = []
+
+    loop_count = TOTAL_ARVIND_LANG
+    language_next_counter = 7
+    lang_limit = 0
+    for i in range(loop_count):
+        try:
+            lang_name = arvind_languages[language_next_counter].get('id')
+            # Increase the language_next_counter to get the next language contents
+            lang_obj = get_lang_obj(lang_name)
+            if lang_obj != None:
+
+                language_source_id = "arvind_main_" + lang_obj.code
+                lang_name = lang_obj.name
+                print("=====> Creating Language topic for ", lang_name)
+                lang_name_lower = lang_name.lower()
+
+                # Filter languages that only has a language topics contents format
+                if lang_name_lower not in SINGLE_TOPIC_LANGUAGES and lang_name_lower not in MULTI_LANGUAGE_TOPIC:
+                    # uncomment this to limit language
+                    # if lang_limit == 1:
+                    #     break
+                    # lang_limit += 1
+
+                    print("=======> This Language in standard format", lang_name)
+                    print("=====>")
+
+                    get_language_data = list(arvind_languages[language_next_counter])
+                    data_contents = { lang_name: create_language_data(get_language_data, lang_obj) }
+
+                    language_topic = TopicNode(title=lang_name.capitalize(), source_id=language_source_id)
+                    generate_child_topics(data_contents, language_topic, lang_obj)
+                    main_topic_list.append(language_topic)
+
+                    print("=====>finished", lang_name)
+
+                if lang_name_lower in SINGLE_TOPIC_LANGUAGES:
+                    # Handle the single topic languages
+                    print("=====> This Language in single topic format ", lang_name)
+                    print("=====>")
+                    print("=====>finished", lang_name)
+                    pass
+
+                if lang_name_lower in MULTI_LANGUAGE_TOPIC:
+                    # Handle the multi topic languages
+                    print("=====> This Language in multiple langauage topic format ", lang_name)
+                    print("=====>")
+                    print("=====>finished", lang_name)
+                    pass
+
+
+        except Exception as e:
+            print('Error Getting Language name:')
+            pp.pprint(e)
+        language_next_counter += 4
 
     # pp.pprint(data_contents)
-        
-
-def scrape_video_data(url ,title):
-
-    params = {"format": "json", "url": url}
-    url_embed = "https://www.youtube.com/oembed"
-    query_string = urllib.parse.urlencode(params)
-    url = url_embed + "?" + query_string
-    video_data = {}
-    print(url)
-    with urllib.request.urlopen(url) as response:
-        response_text = response.read()
-        video_data = json.loads(response_text.decode())
-
-    video_data = []
-    pp = pprint.PrettyPrinter()
-    try:
-        video = ArvindVideo(
-                    url=src, 
-                    title=title, 
-                    description=description, 
-                    lang_code=lang_code,
-                    filename_prefix=filename_prefix)
-        video_data.append(video)
-
-    except Exception as e:
-        print('==> Error scraping video URL', url)
-        pp.pprint(e)
-    return video_data
-
-def download_videos(lang_code):
-    """
-    Scrape, collect, and download the videos and their thumbnails.
-    """
-    video_data = []
-    vinfo = DATA[lang_code]['video_info']
-    try:
-        download_path = vinfo['download_path']
-        video_data = scrape_video_data(
-                            vinfo['video_url'], 
-                            lang_code, 
-                            vinfo['filename_prefix'])
-        print('==> DOWNLOADING', download_path, '====> vinfo', vinfo)
-        # Download video and metadata info for all video objects collected.
-        for i, video in enumerate(video_data):
-            progress = '%d/%d' % (i+1, len(video_data),)
-            progress = '==> %s: Downloading video from %s ...' % (progress, video.url,)
-            print(progress)
-            if video.download(download_dir=download_path, video_data=DATA):
-                # TODO(cpauya): Create VideoTopic then add to channel.
-                pass
-    except Exception as e:
-        print('Error downloading videos:')
-        pp = pprint.PrettyPrinter()
-        pp.pprint(e)
-        raise e
-    print('==> DONE downloading videos for', vinfo)
-    return video_data
-
-def build_english_video_topics(topic):
-    """
-    """
-    video_data = download_videos(LANG_CODE_EN)
-    if not video_data:
-        print('==> Download of Videos FAILED!')
-        return False
-
-
-    for i, video in enumerate(video_data):
-        filepath = video.filepath
-        video_node = VideoNode(
-                source_id=video.uid, 
-                title=video.title, 
-                description=video.description,
-                aggregator=LE,
-                thumbnail=video.thumbnail,
-                license=get_license("CC BY-NC-SA", copyright_holder=POINTB),
-                files=[
-                    VideoFile(
-                        path=filepath,
-                        language=LANG_CODE_EN
-                    )
-                ])
-        topic.add_child(video_node)
-
-    return topic
+    return main_topic_list
 
 
 class ArvindChef(SushiChef):
@@ -203,22 +266,25 @@ class ArvindChef(SushiChef):
         # where you got the content (change me!!)
         "CHANNEL_SOURCE_DOMAIN": "arvindguptatoys.com",
         # channel's unique id (change me!!) # NOTE when you remove test- the channel_id will change; make sure to update notion card
-        "CHANNEL_SOURCE_ID": "beta-arvind",
-        "CHANNEL_LANGUAGE": "en",  # le_utils language code
-        "CHANNEL_THUMBNAIL": 'chefdata/channel_thumbnail.png',
+        "CHANNEL_SOURCE_ID": "arvind-gupta-toys-beta-test",
+        "CHANNEL_LANGUAGE": "mul",  # le_utils language code
+        "CHANNEL_THUMBNAIL": 'chefdata/arvind_gupta_thumbnail.png',
         # (optional)
-        "CHANNEL_DESCRIPTION": "",
+        "CHANNEL_DESCRIPTION": "Math and Science activities through low-cost " \
+                "materials all in the form of videos to provide various pathways for children to explore" \
+                " and deepen their understanding of concepts in low-resource contexts around the world." \
+                " Valuable resource library for teachers to incorporate in their lessons, for parents to" \
+                " work with children at home using readily available, simple, and low-cost materials.",
     }
 
     def construct_channel(self, **kwargs):
 
-        # English topics
-        main_topic = TopicNode(title="English", source_id="arvind_en_main")
-        topic_videos_en = TopicNode(title="Videos", source_id="arvind_en_videos")
-        main_topic.add_child(topic_videos_en)
+        channel = self.get_channel(**kwargs)
 
-        # English videos
-        topic = build_english_video_topics(topic_videos_en)
+        languages_topic = create_languages_topic()
+        for lang_topic in languages_topic:
+            channel.add_child(lang_topic)
+        return channel
 
 
 if __name__ == "__main__":
@@ -226,12 +292,10 @@ if __name__ == "__main__":
     Run this script on the command line using:
         python sushichef.py -v --reset --token=YOURTOKENHERE9139139f3a23232
     """
-    path_maker()
-    scrape_page(AVIND_URL)
 
-    # chef.main()
-    # url = 'https://www.youtube.com/watch?v=TcppMhWI8-U'
-    # scrape_video_data(url)
+    chef = ArvindChef()
+    chef.main()
+    # create_languages_topic()
 
 
 

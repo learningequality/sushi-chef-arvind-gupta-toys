@@ -26,7 +26,7 @@ class ArvindVideo():
         self.filename_prefix = filename_prefix
 
     def __str__(self):
-        return 'ArvindVideo (%s - %s - %s - %s)' % (self.uid, self.url, self.title)
+        return 'ArvindVideo (%s - %s - %s)' % (self.uid, self.url, self.title)
 
     def get_filename(self, download_dir='./'):
         # TODO(cpauya): How to get the mp4 filename from local path?
@@ -51,8 +51,9 @@ class ArvindVideo():
 
         return self.filepath
 
-    def download(self, download_dir="./", video_data=None):
+    def download(self, download_dir="./"):
         print('====> download()', self.get_filename(download_dir))
+
         ydl_options = {
             'outtmpl': self.get_filename(download_dir),
             'writethumbnail': True,
@@ -72,13 +73,11 @@ class ArvindVideo():
                 # from the video metadata.
                 self.uid = vinfo.get('id', '')
 
-                self.title = vinfo.get('title', '')                
-
-                # TODO(cpauya): If Burmese, use the translated video description.
+                self.title = vinfo.get('title', '')                             
+                self.description = vinfo.get('description', '')                             
 
                 # Set the filepath and thumbnail attributes of the video object.
-                self.set_filepath_and_thumbnail(vinfo, download_dir=download_dir)
-                # pp.pprint(self)
+                self.filepath = self.set_filepath_and_thumbnail(vinfo, download_dir=download_dir)
 
                 # # These are useful when debugging.
                 # del vinfo['formats']  # to keep from printing 100+ lines
@@ -91,5 +90,6 @@ class ArvindVideo():
                     youtube_dl.utils.ExtractorError,) as e:
                 # print('==> PointBVideo.download(): Error downloading videos')
                 # pp.pprint(e)
-                raise e
+                pp.pprint(e)
+                return False
         return True
