@@ -42,11 +42,32 @@ SINGLE_TOPIC_LANGUAGES = [
 # List of multiple languages on its sub topics
 MULTI_LANGUAGE_TOPIC = ["russian", "french",]
 
-# List of languages not avialble at the le_utils
-UND_LANG = ["marwari", "bhojpuri", "odiya"]
-
 # This are the estimate total count of languages
-TOTAL_ARVIND_LANG = 25
+TOTAL_ARVIND_LANG = 23
+
+# List of languages not avialble at the le_utils
+UND_LANG = {
+            "marwari":{
+                "name":"marwari",
+                "native_name":"marwari",
+                "code": "mwr",
+            },
+            "bhojpuri":{
+                "name":"bhojpuri",
+                "native_name":"bhojpuri",
+                "code":"bho",
+            },
+            "odiya":{
+                "name":"odiya",
+                "native_name":"odiya",
+                "code":"or",
+            },
+    }
+
+
+SINGLE_TOPIC = "single"
+STANDARD_TOPIC = "standard"
+MULTI_TOPIC = "multi"
 
 
 def get_lang_obj(lang_name):
@@ -115,22 +136,27 @@ def download_video_topics(data, topic, topic_node, lang_obj):
             pp.pprint(e)
 
 
-def generate_child_topics(arvind_contents, main_topic, lang_obj):
+def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
 
     pp = pprint.PrettyPrinter()
     data = arvind_contents[lang_obj.name]
-    for topic in data:
-        print("======> Language topic", topic)
-        source_id = topic + lang_obj.code
-        topic_node = TopicNode(title=topic, source_id=source_id)
+    for topic_index in data:
+        print("======> Language topic", topic_index)
 
-        download_video_topics(data, topic, topic_node, lang_obj)
-        main_topic.add_child(topic_node)
+        if topic_type == STANDARD_TOPIC:
+            source_id = topic_index + lang_obj.code
+            topic_node = TopicNode(title=topic_index, source_id=source_id)
+            download_video_topics(data, topic_index, topic_node, lang_obj)
+            main_topic.add_child(topic_node)
+
+        if topic_type == SINGLE_TOPIC:
+            download_video_topics(data, topic_index, main_topic, lang_obj)
+
 
     return main_topic
 
 
-def create_language_data(lang_data, lang_obj):
+def create_language_data(lang_data, lang_obj, ):
     # Todo clean up this function
     pp = pprint.PrettyPrinter()
     topic_contents = {}
@@ -138,6 +164,7 @@ def create_language_data(lang_data, lang_obj):
     prev_topic = ""
     counter = 1
     topic_limit = 0
+    parent_topic = 0
     total_loop = len(lang_data)
     # pp.pprint(lang_data)
     for item in lang_data:
@@ -156,9 +183,10 @@ def create_language_data(lang_data, lang_obj):
                     topic_details['video_title'] = title
                     topic_details['filename_prefix'] = 'arvind-video-'
                     topic_details['download_path'] = download_path
-                    if topic_limit != 1:
-                        topic_limit += 1
-                        initial_topics.append(topic_details)
+                    # uncomment this to limit topic
+                    # if topic_limit != 1:
+                    #     topic_limit += 1
+                    initial_topics.append(topic_details)
             except:
                 pass
             if counter == 1:
@@ -172,8 +200,11 @@ def create_language_data(lang_data, lang_obj):
                     prev_topic = title.replace(":", "").strip()
                     initial_topics = []
                     topic_limit = 0
+                    # uncomment this to limit topic
+                    # if parent_topic == 2:
+                    #     break
+                    parent_topic += 1
                     # pp.pprint(title)
-
         except:
             pass
 
@@ -189,12 +220,11 @@ def scrape_arvind_page():
     response = requests.get(url)
     page = BeautifulSoup(response.text, 'html5lib')
     content_divs = page.body.div
-
     list_divs = list(content_divs.children)
-    language_divs = list(list_divs[5].children)
-    # language divs is a list of language just
+    laguages_div_start = 5
+    languages_list = list(list_divs[laguages_div_start].children)
 
-    return language_divs
+    return languages_list
 
 
 def create_languages_topic():
@@ -202,10 +232,12 @@ def create_languages_topic():
     pp = pprint.PrettyPrinter()
     main_topic_list = []
 
-    loop_count = TOTAL_ARVIND_LANG
+    loop_max = TOTAL_ARVIND_LANG
     language_next_counter = 7
     lang_limit = 0
-    for i in range(loop_count):
+    loop_couter = 0
+    # for i in range(loop_count):
+    while (loop_couter != loop_max):
         try:
             lang_name = arvind_languages[language_next_counter].get('id')
             # Increase the language_next_counter to get the next language contents
@@ -217,21 +249,22 @@ def create_languages_topic():
                 print("=====> Creating Language topic for ", lang_name)
                 lang_name_lower = lang_name.lower()
 
+                get_language_data = list(arvind_languages[language_next_counter])
+                data_contents = { lang_name: create_language_data(get_language_data, lang_obj) }
+                language_topic = TopicNode(title=lang_name.capitalize(), source_id=language_source_id)
+
                 # Filter languages that only has a language topics contents format
                 if lang_name_lower not in SINGLE_TOPIC_LANGUAGES and lang_name_lower not in MULTI_LANGUAGE_TOPIC:
                     # uncomment this to limit language
-                    # if lang_limit == 1:
+                    # if lang_limit == 8:
                     #     break
                     # lang_limit += 1
 
                     print("=======> This Language in standard format", lang_name)
                     print("=====>")
 
-                    get_language_data = list(arvind_languages[language_next_counter])
-                    data_contents = { lang_name: create_language_data(get_language_data, lang_obj) }
-
-                    language_topic = TopicNode(title=lang_name.capitalize(), source_id=language_source_id)
-                    generate_child_topics(data_contents, language_topic, lang_obj)
+                    topic_type = STANDARD_TOPIC
+                    generate_child_topics(data_contents, language_topic, lang_obj, topic_type)
                     main_topic_list.append(language_topic)
 
                     print("=====>finished", lang_name)
@@ -240,8 +273,16 @@ def create_languages_topic():
                     # Handle the single topic languages
                     print("=====> This Language in single topic format ", lang_name)
                     print("=====>")
+                     # uncomment this to limit language
+                    # if lang_limit == 8:
+                    #     break
+                    # lang_limit += 1
+
+                    topic_type = SINGLE_TOPIC
+                    generate_child_topics(data_contents, language_topic, lang_obj, topic_type)
+                    main_topic_list.append(language_topic)
                     print("=====>finished", lang_name)
-                    pass
+
 
                 if lang_name_lower in MULTI_LANGUAGE_TOPIC:
                     # Handle the multi topic languages
@@ -250,11 +291,11 @@ def create_languages_topic():
                     print("=====>finished", lang_name)
                     pass
 
-
         except Exception as e:
-            print('Error Getting Language name:')
             pp.pprint(e)
+            break
         language_next_counter += 4
+        loop_couter += 1
 
     # pp.pprint(data_contents)
     return main_topic_list
@@ -296,14 +337,3 @@ if __name__ == "__main__":
     chef = ArvindChef()
     chef.main()
     # create_languages_topic()
-
-
-
-
-
-
-
-
-
-
-
