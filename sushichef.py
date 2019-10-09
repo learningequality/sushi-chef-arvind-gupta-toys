@@ -82,18 +82,23 @@ def get_lang_obj(lang_name):
 
 def clean_video_title(title, lang_obj):
     # Remove redundant and misleading words in the video title
+    pp = pprint.PrettyPrinter()
     clean_title = title
     try:
         if title != None:
-            clean_str = title.replace("-", "").replace("MB", "")
+            clean_str = title.replace("-", " ").replace("MB", "").replace("|", "")
             clean_uplang = clean_str.replace(lang_obj.name.upper(), "")
             clean_lowlang = clean_uplang.replace(lang_obj.name.lower(), "")
             clean_caplang = clean_lowlang.replace(lang_obj.name.capitalize() , "")
-            clean_format = clean_caplang.replace(".avi", "").replace(".wmv", "")
-            clean_title = re.sub(r'\d+', '', clean_format)
-            print("=====> clean title", clean_title)
+            clean_format = clean_caplang.replace(".avi", "").replace(".wmv", "").strip()
+            clean_extra_spaces = re.sub(" +", " ",clean_format)
+            is_int = clean_extra_spaces[-2:]
+            if is_int.isdigit():
+                clean_extra_spaces = clean_extra_spaces.replace(is_int, "")
+            clean_title = clean_extra_spaces
+            print("clean video title ====> ", clean_title)
     except Exception as e:
-        print('Error cleaning video title:')
+        print('Error cleaning this video title: ', clean_title)
         pp.pprint(e)
     return clean_title
 
@@ -148,7 +153,6 @@ def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
     data = arvind_contents[lang_obj.name]
     for topic_index in data:
         print("======> Language topic", topic_index)
-
         if topic_type == STANDARD_TOPIC:
             source_id = topic_index + lang_obj.code
             topic_node = TopicNode(title=topic_index, source_id=source_id)
@@ -157,8 +161,6 @@ def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
 
         if topic_type == SINGLE_TOPIC:
             download_video_topics(data, topic_index, main_topic, lang_obj)
-
-
     return main_topic
 
 
@@ -213,7 +215,6 @@ def create_language_data(lang_data, lang_obj, ):
                     # pp.pprint(title)
         except:
             pass
-
         if total_loop == 0:
             topic_contents[prev_topic] = initial_topics
     return topic_contents
@@ -229,7 +230,6 @@ def scrape_arvind_page():
     list_divs = list(content_divs.children)
     laguages_div_start = 5
     languages_list = list(list_divs[laguages_div_start].children)
-
     return languages_list
 
 
@@ -288,7 +288,6 @@ def create_languages_topic():
                     generate_child_topics(data_contents, language_topic, lang_obj, topic_type)
                     main_topic_list.append(language_topic)
                     print("=====>finished", lang_name)
-
 
                 if lang_name_lower in MULTI_LANGUAGE_TOPIC:
                     # Handle the multi topic languages
