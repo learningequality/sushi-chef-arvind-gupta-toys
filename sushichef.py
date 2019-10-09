@@ -83,12 +83,18 @@ def get_lang_obj(lang_name):
 def clean_video_title(title, lang_obj):
     # Remove redundant and misleading words in the video title
     clean_title = title
-    if title != None:
-        clean_str = title.replace("-", "").replace("MB", "")
-        clean_lang = clean_str.replace(lang_obj.name.upper(), "")
-        clean_format = clean_lang.replace(".avi", "").replace(".wmv", "")
-        clean_title = re.sub(r'\d+', '', clean_format)
-        print("=====> clean title", clean_title)
+    try:
+        if title != None:
+            clean_str = title.replace("-", "").replace("MB", "")
+            clean_uplang = clean_str.replace(lang_obj.name.upper(), "")
+            clean_lowlang = clean_uplang.replace(lang_obj.name.lower(), "")
+            clean_caplang = clean_lowlang.replace(lang_obj.name.capitalize() , "")
+            clean_format = clean_caplang.replace(".avi", "").replace(".wmv", "")
+            clean_title = re.sub(r'\d+', '', clean_format)
+            print("=====> clean title", clean_title)
+    except Exception as e:
+        print('Error cleaning video title:')
+        pp.pprint(e)
     return clean_title
 
 
@@ -274,7 +280,7 @@ def create_languages_topic():
                     print("=====> This Language in single topic format ", lang_name)
                     print("=====>")
                      # uncomment this to limit language
-                    # if lang_limit == 8:
+                    # if lang_limit == 2:
                     #     break
                     # lang_limit += 1
 
