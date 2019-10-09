@@ -99,7 +99,7 @@ def clean_video_title(title, lang_obj):
             print("clean video title ====> ", clean_title)
     except Exception as e:
         print('Error cleaning this video title: ', clean_title)
-        pp.pprint(e)
+
     return clean_title
 
 
@@ -144,7 +144,6 @@ def download_video_topics(data, topic, topic_node, lang_obj):
 
         except Exception as e:
             print('Error downloading videos:')
-            pp.pprint(e)
 
 
 def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
@@ -297,7 +296,7 @@ def create_languages_topic():
                     pass
 
         except Exception as e:
-            pp.pprint(e)
+            print("===> error getting laguage topics")
             break
         language_next_counter += 4
         loop_couter += 1
