@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import html
 import os
 import pprint
 import requests
@@ -105,10 +104,10 @@ def clean_video_title(title, lang_obj):
 
 def include_video_topic(topic_node, video_data, lang_obj):
     video = video_data
-    create_id = uuid.uuid4().hex[:6].lower()
+    create_id = uuid.uuid4().hex[:12].lower()
     video_source_id = create_id + str(video.uid) 
     video_node = VideoNode(
-        source_id=video.uid, 
+        source_id=video_source_id, 
         title=clean_video_title(video.title, lang_obj), 
         description=video.description,
         aggregator=LE,
@@ -210,7 +209,7 @@ def create_language_data(lang_data, lang_obj, ):
                     # uncomment this to limit topic
                     # if parent_topic == 2:
                     #     break
-                    parent_topic += 1
+                    # parent_topic += 1
                     # pp.pprint(title)
         except:
             pass
@@ -278,7 +277,7 @@ def create_languages_topic():
                     # Handle the single topic languages
                     print("=====> This Language in single topic format ", lang_name)
                     print("=====>")
-                     # uncomment this to limit language
+                    # uncomment this to limit language
                     # if lang_limit == 2:
                     #     break
                     # lang_limit += 1
@@ -296,8 +295,7 @@ def create_languages_topic():
                     pass
 
         except Exception as e:
-            print("===> error getting laguage topics")
-            break
+            print("===> error getting laguage topics", e)
         language_next_counter += 4
         loop_couter += 1
 
