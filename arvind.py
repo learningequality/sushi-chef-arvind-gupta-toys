@@ -1,6 +1,62 @@
 import pprint
 import youtube_dl
 
+from le_utils.constants.languages import getlang_by_name
+
+
+# List of languages not avialble at the le_utils
+UND_LANG = {
+            "marwari":{
+                "name":"Marwari",
+                "native_name":"marwari",
+                "code": "mwr",
+            },
+            "bhojpuri":{
+                "name":"Bhojpuri",
+                "native_name":"bhojpuri",
+                "code":"bho",
+            },
+            "odiya":{
+                "name":"Odiya",
+                "native_name":"odiya",
+                "code":"or",
+            },
+            "sci_edu":{
+                "name":"Science/Educational",
+                "native_name":"hindi",
+                "code":"hi",
+            },
+    }
+
+
+class ArvindLanguage():
+    name = ''
+    code = ''
+    native_name = ''
+
+    def __init__(self, name='', code='', native_name=''):
+        self.name = name.lower()
+        self.code = code
+        self.native_name = native_name
+
+    def set_value(self, name, code, native_name):
+        self.name = name
+        self.code = code
+        self.native_name = native_name
+
+    def get_lang_obj(self):
+        if self.name != "":
+            lang_name = self.name
+            language_obj = getlang_by_name(lang_name)
+            if not language_obj:
+                if UND_LANG[self.name]:
+                    self.set_value(UND_LANG[self.name]["name"], UND_LANG[self.name]["code"], UND_LANG[self.name]["native_name"])
+                    return True
+            else:
+                self.set_value(language_obj.name, language_obj.code, language_obj.native_name)
+                return True
+        return False
+
 
 class ArvindVideo():
 
@@ -12,7 +68,9 @@ class ArvindVideo():
     thumbnail = ''  # local path to thumbnail image
     filepath = ''  # local path to video file
     filename_prefix = ''
+    license = ''
     download_dir = './'
+    license_common = False
 
     def __init__(self, uid=0, url='', title='', description='', language='', 
             filename_prefix=''):
@@ -68,6 +126,7 @@ class ArvindVideo():
             pp = pprint.PrettyPrinter()
             try:
                 ydl.add_default_info_extractors()
+                # vinfo = ydl.extract_info(self.url, download=True)
                 vinfo = ydl.extract_info(self.url, download=True)
                 # Save the remaining "temporary scraped values" of attributes with actual values
                 # from the video metadata.
@@ -78,18 +137,18 @@ class ArvindVideo():
 
                 # Set the filepath and thumbnail attributes of the video object.
                 self.filepath = self.set_filepath_and_thumbnail(vinfo, download_dir=download_dir)
+                
+                if not vinfo['license']:
+                    self.license = "Licensed not available"
+                elif vinfo['license'].find("Creative Commons") != -1:
+                    self.license_common = True
+                else:
+                    self.license = vinfo['license']
 
-                # # These are useful when debugging.
-                # del vinfo['formats']  # to keep from printing 100+ lines
-                # del vinfo['requested_formats']  # to keep from printing 100+ lines
-                # print('==> Printing video info:')
-                # pp.pprint(vinfo)
-                # print('==> NEW', self)
             except (youtube_dl.utils.DownloadError,
                     youtube_dl.utils.ContentTooShortError,
                     youtube_dl.utils.ExtractorError,) as e:
-                # print('==> PointBVideo.download(): Error downloading videos')
-                # pp.pprint(e)
-                pp.pprint(e)
-                return False
+                    print('==> Error downloading videos', e)
+                    # pp.pprint(e)
+                    return False
         return True
