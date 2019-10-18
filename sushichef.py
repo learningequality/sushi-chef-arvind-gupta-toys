@@ -74,7 +74,7 @@ def clean_video_title(title, lang_obj):
     return clean_title
 
 
-def include_video_topic(topic_node, video_data):
+def include_video_topic(topic_node, video_data, lang_obj):
     video = video_data
     create_id = uuid.uuid4().hex[:12].lower()
     video_source_id = create_id + str(video.uid) 
@@ -108,7 +108,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
     Scrape, collect, and download the videos and their thumbnails.
     """
     pp = pprint.PrettyPrinter()
-
+    topic_limit = 0
     for vinfo in data[topic]:
         try:
             video = ArvindVideo(
@@ -121,7 +121,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
             download_path = vinfo['download_path'] + "/" + topic + "/"
             if video.download(download_dir=download_path):
                 if video.license_common:
-                    include_video_topic(topic_node, topic, video)
+                    include_video_topic(topic_node, video, lang_obj)
                 else:
                     print("=====> Video has no available creative common license", video.url)
                     save_skip_videos(video, topic, lang_obj)
@@ -137,7 +137,6 @@ def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
     pp = pprint.PrettyPrinter()
     data = arvind_contents[lang_obj.name]
     for topic_index in data:
-        print("======> Language topic", topic_index)
         if topic_type == STANDARD_TOPIC:
             source_id = topic_index + lang_obj.code
             topic_node = TopicNode(title=topic_index, source_id=source_id)
@@ -191,21 +190,13 @@ def create_language_data(lang_data, lang_obj):
                     topic_details['video_title'] = title
                     topic_details['filename_prefix'] = 'arvind-video-'
                     topic_details['download_path'] = download_path
-                    # uncomment this to limit topic
-                    # if topic_limit != 1:
-                    #     topic_limit += 1
-
+                    
                     if lang_name in MULTI_LANGUAGE_TOPIC:
          
                         if prev_topic != current_lang:
                             topic_contents[prev_topic] = initial_topics
                             initial_topics = []
                             prev_topic = current_lang
-
-                            # uncomment this to limit topic
-                            if parent_topic == 10:
-                                break
-                            parent_topic += 1
 
                     initial_topics.append(topic_details)
             except:
@@ -252,7 +243,7 @@ def get_language_details(lang_name):
     return None
 
 
-def create_languages_topic():
+def create_language_topic():
     arvind_languages = scrape_arvind_page()
     pp = pprint.PrettyPrinter()
     main_topic_list = []
@@ -282,13 +273,8 @@ def create_languages_topic():
 
                 # Filter languages that only has a language topics contents format
                 if lang_name_lower not in SINGLE_TOPIC_LANGUAGES and lang_name_lower not in MULTI_LANGUAGE_TOPIC:
-                    # uncomment this to limit language
-                    # if lang_limit == 8:
-                    #     break
-                    # lang_limit += 1
-
-                    # print("=======> This Language in standard format", lang_name)
-                    # print("=====>")
+                    print("=======> This Language in standard format", lang_name)
+                    print("=====>")
 
                     topic_type = STANDARD_TOPIC
                     generate_child_topics(data_contents, language_topic, lang_obj, topic_type)
@@ -298,12 +284,8 @@ def create_languages_topic():
 
                 if lang_name_lower in SINGLE_TOPIC_LANGUAGES:
                     # Handle the single topic languages
-                    # print("=====> This Language in single topic format ", lang_name)
-                    # print("=====>")
-                    # uncomment this to limit language
-                    # if lang_limit == 1:
-                    #     break
-                    # lang_limit += 1
+                    print("=====> This Language in single topic format ", lang_name)
+                    print("=====>")
 
                     topic_type = SINGLE_TOPIC
                     generate_child_topics(data_contents, language_topic, lang_obj, topic_type)
@@ -314,8 +296,6 @@ def create_languages_topic():
                 if lang_name_lower in MULTI_LANGUAGE_TOPIC:
                     # Handle the multi topic languages
 
-
-                    # generate_child_topics(data_contents, language_topic, lang_obj, topic_type)
                     print("=====> This Language in multiple langauage topic format ", lang_name)
                     print("=====>")
                     lang_data = create_language_data(get_language_data, lang_obj)
@@ -325,15 +305,11 @@ def create_languages_topic():
                             topic_type = SINGLE_TOPIC
                             parent_source_id = "arvind_main_" + lang.lower()
                             parent_topic = TopicNode(title=lang.capitalize(), source_id=parent_source_id)
-                            # print("lang data ==>", lang_data[lang])
-                            # print("topic_type ==>", topic_type)
-                            # print("current_lang ==>", current_lang.name)
                             data_dic = {current_lang.name: {"": lang_data[lang]}}
 
                             # if lang_limit == 1:
                             #     break
                             # lang_limit += 1
-
                             topic_type = SINGLE_TOPIC
                             # pp.pprint(data_dic)
                             generate_child_topics(data_dic, parent_topic, current_lang, topic_type)
@@ -371,10 +347,11 @@ class ArvindChef(SushiChef):
 
         channel = self.get_channel(**kwargs)
 
-        languages_topic = create_languages_topic()
+        languages_topic = create_language_topic()
         for lang_topic in languages_topic:
             channel.add_child(lang_topic)
         return channel
+
 
 if __name__ == "__main__":
     """
@@ -384,4 +361,4 @@ if __name__ == "__main__":
 
     chef = ArvindChef()
     chef.main()
-    # create_languages_topic()
+    # create_language_topic()

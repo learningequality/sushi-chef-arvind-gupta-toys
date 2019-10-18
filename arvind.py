@@ -87,7 +87,6 @@ class ArvindVideo():
         return 'ArvindVideo (%s - %s - %s)' % (self.uid, self.url, self.title)
 
     def get_filename(self, download_dir='./'):
-        # TODO(cpauya): How to get the mp4 filename from local path?
         filename = download_dir + self.filename_prefix + '%(id)s.%(ext)s'
         # MUST: make sure to save the `download_dir` for reuse later.
         self.download_dir = download_dir
