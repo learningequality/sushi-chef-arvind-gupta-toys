@@ -45,10 +45,13 @@ class ArvindLanguage():
         self.native_name = native_name
 
     def get_lang_obj(self):
+
         if self.name != "":
             lang_name = self.name
             language_obj = getlang_by_name(lang_name)
+
             if not language_obj:
+                
                 if UND_LANG[self.name]:
                     self.set_value(UND_LANG[self.name]["name"], UND_LANG[self.name]["code"], UND_LANG[self.name]["native_name"])
                     return True
@@ -102,6 +105,7 @@ class ArvindVideo():
 
         for thumbnail in video_info.get('thumbnails', None):
             value = thumbnail.get('filename', '')
+
             if value:
                 self.thumbnail = value
                 break
@@ -110,7 +114,6 @@ class ArvindVideo():
 
     def download(self, download_dir="./"):
         print('====> download()', self.get_filename(download_dir))
-
         ydl_options = {
             'outtmpl': self.get_filename(download_dir),
             'writethumbnail': True,
@@ -130,7 +133,6 @@ class ArvindVideo():
                 # Save the remaining "temporary scraped values" of attributes with actual values
                 # from the video metadata.
                 self.uid = vinfo.get('id', '')
-
                 self.title = vinfo.get('title', '')                             
                 self.description = vinfo.get('description', '')                             
 
