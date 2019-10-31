@@ -81,7 +81,7 @@ class ArvindVideo():
         self.url = url
         self.title = title
         self.description = description
-        self.thumbnail = ''
+        self.thumbnail = None
         self.filepath = ''
         self.language = language
         self.filename_prefix = filename_prefix
@@ -104,7 +104,7 @@ class ArvindVideo():
         self.filepath = filename % video_info
 
         for thumbnail in video_info.get('thumbnails', None):
-            value = thumbnail.get('filename', '')
+            value = thumbnail.get('url')
 
             if value:
                 self.thumbnail = value
@@ -112,8 +112,8 @@ class ArvindVideo():
 
         return self.filepath
 
-    def download(self, download_dir="./"):
-        print('====> download()', self.get_filename(download_dir))
+    def download_info(self, download_dir="./", download=False):
+        print('====> download_info()', self.get_filename(download_dir))
         ydl_options = {
             'outtmpl': self.get_filename(download_dir),
             'writethumbnail': True,
@@ -129,19 +129,19 @@ class ArvindVideo():
             try:
                 ydl.add_default_info_extractors()
                 # vinfo = ydl.extract_info(self.url, download=True)
-                vinfo = ydl.extract_info(self.url, download=True)
+                vinfo = ydl.extract_info(self.url, download=download)
                 # Save the remaining "temporary scraped values" of attributes with actual values
                 # from the video metadata.
-                self.uid = vinfo.get('id', '')
-                self.title = vinfo.get('title', '')                             
-                self.description = vinfo.get('description', '')                             
+                self.uid = vinfo['id']  # video must have id because required to set youtube_id later
+                self.title = vinfo.get('title', '')
+                self.description = vinfo.get('description', '')
 
                 # Set the filepath and thumbnail attributes of the video object.
                 self.filepath = self.set_filepath_and_thumbnail(vinfo, download_dir=download_dir)
                 
                 if not vinfo['license']:
                     self.license = "Licensed not available"
-                elif vinfo['license'].find("Creative Commons") != -1:
+                elif "Creative Commons" in vinfo['license']:
                     self.license_common = True
                 else:
                     self.license = vinfo['license']

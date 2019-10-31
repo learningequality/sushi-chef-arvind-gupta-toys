@@ -11,7 +11,7 @@ from arvind import ArvindVideo, ArvindLanguage
 from bs4 import BeautifulSoup
 
 from ricecooker.chefs import SushiChef
-from ricecooker.classes.files import VideoFile
+from ricecooker.classes.files import YouTubeVideoFile
 from ricecooker.classes.licenses import get_license
 from ricecooker.classes.nodes import VideoNode, TopicNode
 
@@ -75,17 +75,17 @@ def include_video_topic(topic_node, video_data, lang_obj):
     # Include video details to the parent topic node
     video = video_data
     create_id = uuid.uuid4().hex[:12].lower()
-    video_source_id = create_id + str(video.uid) 
+    video_source_id = str(video.uid)
     video_node = VideoNode(
         source_id=video_source_id, 
         title=clean_video_title(video.title, lang_obj), 
         description=video.description,
-        aggregator=LE,
+        author=ARVIND,
         thumbnail=video.thumbnail,
         license=get_license("CC BY-NC", copyright_holder=ARVIND),
         files=[
-            VideoFile(
-                path=video.filepath,
+            YouTubeVideoFile(
+                youtube_id=video.uid,
                 language=video.language
             )
         ])
@@ -118,7 +118,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
 
             download_path = vinfo['download_path'] + "/" + topic + "/"
 
-            if video.download(download_dir=download_path):
+            if video.download_info(download_dir=download_path):
 
                 if video.license_common:
                     include_video_topic(topic_node, video, lang_obj)
