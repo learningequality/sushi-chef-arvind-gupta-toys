@@ -4,9 +4,10 @@ import os
 import pprint
 import requests
 import re
+import shutil
 import uuid
 
-from arvind import ArvindVideo, ArvindLanguage
+from arvind import ArvindVideo, ArvindLanguage, YOUTUBE_CACHE_DIR
 
 from bs4 import BeautifulSoup
 
@@ -309,6 +310,15 @@ class ArvindChef(SushiChef):
                 " Valuable resource library for teachers to incorporate in their lessons, for parents to" \
                 " work with children at home using readily available, simple, and low-cost materials.",
     }
+
+    def pre_run(self, args, options):
+        """This function will get called by ricecooker before the chef runs."""
+        if args['update']:
+            # delete video info .json files cached in chefdata/youtubecache/
+            print('Deleting vinfo .json files in {}'.format(YOUTUBE_CACHE_DIR))
+            if os.path.exists(YOUTUBE_CACHE_DIR):
+                shutil.rmtree(YOUTUBE_CACHE_DIR)
+            os.makedirs(YOUTUBE_CACHE_DIR)
 
     def construct_channel(self, **kwargs):
 
