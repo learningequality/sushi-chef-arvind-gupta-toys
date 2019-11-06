@@ -4,14 +4,15 @@ import os
 import pprint
 import requests
 import re
+import shutil
 import uuid
 
-from arvind import ArvindVideo, ArvindLanguage
+from arvind import ArvindVideo, ArvindLanguage, YOUTUBE_CACHE_DIR
 
 from bs4 import BeautifulSoup
 
 from ricecooker.chefs import SushiChef
-from ricecooker.classes.files import VideoFile
+from ricecooker.classes.files import YouTubeVideoFile
 from ricecooker.classes.licenses import get_license
 from ricecooker.classes.nodes import VideoNode, TopicNode
 
@@ -75,17 +76,17 @@ def include_video_topic(topic_node, video_data, lang_obj):
     # Include video details to the parent topic node
     video = video_data
     create_id = uuid.uuid4().hex[:12].lower()
-    video_source_id = create_id + str(video.uid) 
+    video_source_id = str(video.uid)  # For YouTube imports, set source_id to the youtube_id
     video_node = VideoNode(
         source_id=video_source_id, 
         title=clean_video_title(video.title, lang_obj), 
         description=video.description,
-        aggregator=LE,
+        author=ARVIND,
         thumbnail=video.thumbnail,
         license=get_license("CC BY-NC", copyright_holder=ARVIND),
         files=[
-            VideoFile(
-                path=video.filepath,
+            YouTubeVideoFile(
+                youtube_id=video.uid,
                 language=video.language
             )
         ])
@@ -118,7 +119,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
 
             download_path = vinfo['download_path'] + "/" + topic + "/"
 
-            if video.download(download_dir=download_path):
+            if video.download_info(download_dir=download_path):
 
                 if video.license_common:
                     include_video_topic(topic_node, video, lang_obj)
@@ -138,8 +139,7 @@ def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
     for topic_index in data:
 
         if topic_type == STANDARD_TOPIC:
-            create_id = uuid.uuid4().hex[:12].lower()
-            source_id = create_id + topic_index + lang_obj.code
+            source_id = lang_obj.code + '_' + topic_index
             topic_node = TopicNode(title=topic_index, source_id=source_id)
             download_video_topics(data, topic_index, topic_node, lang_obj)
             main_topic.add_child(topic_node)
@@ -247,8 +247,7 @@ def create_language_topic():
             lang_obj = get_language_details(lang_name.lower())
 
             if lang_obj != None:
-                create_id = uuid.uuid4().hex[:12].lower()
-                language_source_id = create_id + "arvind_main_" + lang_obj.code
+                language_source_id = "arvind_main_" + lang_obj.code
                 lang_name = lang_obj.name
                 lang_name_lower = lang_name.lower()
                 get_language_data = list(arvind_languages[language_next_int])
@@ -277,7 +276,7 @@ def create_language_topic():
 
                         if current_lang != None:
                             topic_type = SINGLE_TOPIC
-                            parent_source_id = create_id + "arvind_main_" + lang.lower()
+                            parent_source_id = "arvind_main_" + lang.lower()
                             parent_topic = TopicNode(title=lang.capitalize(), source_id=parent_source_id)
                             data_dic = {current_lang.name: {"": lang_data[lang]}}
 
@@ -311,6 +310,15 @@ class ArvindChef(SushiChef):
                 " Valuable resource library for teachers to incorporate in their lessons, for parents to" \
                 " work with children at home using readily available, simple, and low-cost materials.",
     }
+
+    def pre_run(self, args, options):
+        """This function will get called by ricecooker before the chef runs."""
+        if args['update']:
+            # delete video info .json files cached in chefdata/youtubecache/
+            print('Deleting vinfo .json files in {}'.format(YOUTUBE_CACHE_DIR))
+            if os.path.exists(YOUTUBE_CACHE_DIR):
+                shutil.rmtree(YOUTUBE_CACHE_DIR)
+            os.makedirs(YOUTUBE_CACHE_DIR)
 
     def construct_channel(self, **kwargs):
 

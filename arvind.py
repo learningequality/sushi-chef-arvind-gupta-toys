@@ -1,20 +1,26 @@
+import json
+import os
 import pprint
+import re
 import youtube_dl
 
 from le_utils.constants.languages import getlang_by_name
 
+
+YOUTUBE_CACHE_DIR = os.path.join('chefdata', 'youtubecache')
+YOUTUBE_ID_REGEX = re.compile(r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/(watch\?v=|embed/|v/|.+\?v=)?(?P<youtube_id>[A-Za-z0-9\-=_]{11})')
 
 # List of languages not avialble at the le_utils
 UND_LANG = {
             "marwari":{
                 "name":"Marwari",
                 "native_name":"marwari",
-                "code": "mwr",
+                "code": "und",      # temporary while le-utils updated in Studio
             },
             "bhojpuri":{
                 "name":"Bhojpuri",
                 "native_name":"bhojpuri",
-                "code":"bho",
+                "code":"und",       # temporary while le-utils updated in Studio
             },
             "odiya":{
                 "name":"Odiya",
@@ -61,6 +67,7 @@ class ArvindLanguage():
         return False
 
 
+
 class ArvindVideo():
 
     uid = 0   # value from `id` after `youtube_dl.extract_info()`
@@ -81,7 +88,7 @@ class ArvindVideo():
         self.url = url
         self.title = title
         self.description = description
-        self.thumbnail = ''
+        self.thumbnail = None
         self.filepath = ''
         self.language = language
         self.filename_prefix = filename_prefix
@@ -104,7 +111,7 @@ class ArvindVideo():
         self.filepath = filename % video_info
 
         for thumbnail in video_info.get('thumbnails', None):
-            value = thumbnail.get('filename', '')
+            value = thumbnail.get('url')
 
             if value:
                 self.thumbnail = value
@@ -112,8 +119,8 @@ class ArvindVideo():
 
         return self.filepath
 
-    def download(self, download_dir="./"):
-        print('====> download()', self.get_filename(download_dir))
+    def download_info(self, download_dir="./", download=False):
+        print('====> download_info()', self.get_filename(download_dir))
         ydl_options = {
             'outtmpl': self.get_filename(download_dir),
             'writethumbnail': True,
@@ -124,32 +131,49 @@ class ArvindVideo():
             # Note the format specification is important so we get mp4 and not taller than 480
             'format': "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]"
         }
-        with youtube_dl.YoutubeDL(ydl_options) as ydl:
-            pp = pprint.PrettyPrinter()
-            try:
-                ydl.add_default_info_extractors()
-                # vinfo = ydl.extract_info(self.url, download=True)
-                vinfo = ydl.extract_info(self.url, download=True)
-                # Save the remaining "temporary scraped values" of attributes with actual values
-                # from the video metadata.
-                self.uid = vinfo.get('id', '')
-                self.title = vinfo.get('title', '')                             
-                self.description = vinfo.get('description', '')                             
 
-                # Set the filepath and thumbnail attributes of the video object.
-                self.filepath = self.set_filepath_and_thumbnail(vinfo, download_dir=download_dir)
-                
-                if not vinfo['license']:
-                    self.license = "Licensed not available"
-                elif vinfo['license'].find("Creative Commons") != -1:
-                    self.license_common = True
-                else:
-                    self.license = vinfo['license']
+        match = YOUTUBE_ID_REGEX.match(self.url)
+        if not match:
+            print('==> URL ' + self.url + ' does not match YOUTUBE_ID_REGEX')
+            return False
+        youtube_id = match.group('youtube_id')
 
-            except (youtube_dl.utils.DownloadError,
-                    youtube_dl.utils.ContentTooShortError,
-                    youtube_dl.utils.ExtractorError,) as e:
-                    print('==> Error downloading videos', e)
-                    # pp.pprint(e)
-                    return False
+        vinfo_json_path = os.path.join(YOUTUBE_CACHE_DIR, youtube_id+'.json')
+        # First try to get from cache:
+        if os.path.exists(vinfo_json_path):
+            vinfo = json.load(open(vinfo_json_path))
+
+        # else get using youtube_dl:
+        else:
+            with youtube_dl.YoutubeDL(ydl_options) as ydl:
+                pp = pprint.PrettyPrinter()
+                try:
+                    ydl.add_default_info_extractors()
+                    # vinfo = ydl.extract_info(self.url, download=True)
+                    vinfo = ydl.extract_info(self.url, download=download)
+                    # Save the remaining "temporary scraped values" of attributes with actual values
+                    # from the video metadata.
+                    json.dump(vinfo, open(vinfo_json_path, 'w'), indent=4, ensure_ascii=False, sort_keys=True)
+
+                except (youtube_dl.utils.DownloadError,
+                        youtube_dl.utils.ContentTooShortError,
+                        youtube_dl.utils.ExtractorError,) as e:
+                        print('==> Error downloading videos', e)
+                        # pp.pprint(e)
+                        return False
+
+        self.uid = vinfo['id']  # video must have id because required to set youtube_id later
+        self.title = vinfo.get('title', '')
+        self.description = vinfo.get('description', '')
+
+        # Set the filepath and thumbnail attributes of the video object.
+        self.filepath = self.set_filepath_and_thumbnail(vinfo, download_dir=download_dir)
+
+        if not vinfo['license']:
+            self.license = "Licensed not available"
+        elif "Creative Commons" in vinfo['license']:
+            self.license_common = True
+        else:
+            self.license = vinfo['license']
+
         return True
