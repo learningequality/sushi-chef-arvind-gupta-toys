@@ -76,75 +76,46 @@ class ArvindVideo():
     url = ''
     language = ''
     thumbnail = ''  # local path to thumbnail image
-    filepath = ''  # local path to video file
-    filename_prefix = ''
     license = ''
     download_dir = './'
     license_common = False
 
-    def __init__(self, uid=0, url='', title='', description='', language='', 
-            filename_prefix=''):
+    def __init__(self, uid=0, url='', title='', description='', language='',):
         self.uid = str(uid)
         self.url = url
         self.title = title
         self.description = description
         self.thumbnail = None
-        self.filepath = ''
         self.language = language
-        self.filename_prefix = filename_prefix
 
     def __str__(self):
         return 'ArvindVideo (%s - %s - %s)' % (self.uid, self.url, self.title)
 
-    def get_filename(self, download_dir='./'):
-        filename = download_dir + self.filename_prefix + '%(id)s.%(ext)s'
-        # MUST: make sure to save the `download_dir` for reuse later.
-        self.download_dir = download_dir
-        return filename
-
-    def set_filepath_and_thumbnail(self, video_info, download_dir='./'):
-        # MUST: assign the filename to the `filepath` attribute based on
-        # the video_info dict argument.
-        # Also traverses the `video_info['thumbnails']` list to get the image filename
-        # to be used for the `thumbnail` attribute.
-        filename = self.get_filename(download_dir=self.download_dir)
-        self.filepath = filename % video_info
-
-        for thumbnail in video_info.get('thumbnails', None):
-            value = thumbnail.get('url')
-
-            if value:
-                self.thumbnail = value
-                break
-
-        return self.filepath
-
     def download_info(self, download_dir="./", download=False):
-        print('====> download_info()', self.get_filename(download_dir))
-        ydl_options = {
-            'outtmpl': self.get_filename(download_dir),
-            'writethumbnail': True,
-            'no_warnings': True,
-            'continuedl': False,
-            'restrictfilenames': True,
-            'quiet': False,
-            # Note the format specification is important so we get mp4 and not taller than 480
-            'format': "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]"
-        }
 
         match = YOUTUBE_ID_REGEX.match(self.url)
         if not match:
             print('==> URL ' + self.url + ' does not match YOUTUBE_ID_REGEX')
             return False
         youtube_id = match.group('youtube_id')
-
+        if not os.path.isdir(YOUTUBE_CACHE_DIR):
+            os.mkdir(YOUTUBE_CACHE_DIR)
         vinfo_json_path = os.path.join(YOUTUBE_CACHE_DIR, youtube_id+'.json')
         # First try to get from cache:
         if os.path.exists(vinfo_json_path):
             vinfo = json.load(open(vinfo_json_path))
-
         # else get using youtube_dl:
         else:
+            ydl_options = {
+                'outtmpl': youtube_id,
+                'writethumbnail': True,
+                'no_warnings': True,
+                'continuedl': False,
+                'restrictfilenames': True,
+                'quiet': False,
+                # Note the format specification is important so we get mp4 and not taller than 480
+                'format': "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]"
+            }
             with youtube_dl.YoutubeDL(ydl_options) as ydl:
                 pp = pprint.PrettyPrinter()
                 try:
@@ -158,17 +129,13 @@ class ArvindVideo():
                 except (youtube_dl.utils.DownloadError,
                         youtube_dl.utils.ContentTooShortError,
                         youtube_dl.utils.ExtractorError,) as e:
-                        print('==> Error downloading videos', e)
+                        print('==> Error downloading this video', e)
                         # pp.pprint(e)
                         return False
 
         self.uid = vinfo['id']  # video must have id because required to set youtube_id later
         self.title = vinfo.get('title', '')
         self.description = vinfo.get('description', '')
-
-        # Set the filepath and thumbnail attributes of the video object.
-        self.filepath = self.set_filepath_and_thumbnail(vinfo, download_dir=download_dir)
-
         if not vinfo['license']:
             self.license = "Licensed not available"
         elif "Creative Commons" in vinfo['license']:

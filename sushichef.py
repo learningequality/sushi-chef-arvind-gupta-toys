@@ -114,8 +114,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
             video = ArvindVideo(
                 url=vinfo['video_url'], 
                 title=vinfo['video_title'], 
-                language=lang_obj.code,
-                filename_prefix=vinfo['filename_prefix'])
+                language=lang_obj.code)
 
             download_path = vinfo['download_path'] + "/" + topic + "/"
 
@@ -179,7 +178,6 @@ def create_language_data(lang_data, lang_obj):
                         download_path = DOWNLOADS_VIDEOS_PATH + prev_topic
                     topic_details['video_url'] = video_link
                     topic_details['video_title'] = title
-                    topic_details['filename_prefix'] = 'arvind-video-'
                     topic_details['download_path'] = download_path
                     
                     if lang_name in MULTI_LANGUAGE_TOPIC:
