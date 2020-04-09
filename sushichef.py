@@ -117,6 +117,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
                 language=lang_obj.code)
 
             download_path = vinfo['download_path'] + "/" + topic + "/"
+            os.makedirs(download_path, exist_ok=True)
 
             if video.download_info(download_dir=download_path):
 

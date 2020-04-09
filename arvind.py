@@ -1,14 +1,16 @@
 import json
 import os
-import pprint
 import re
+
 import youtube_dl
+
+from pressurecooker.youtube import YouTubeResource
 
 from le_utils.constants.languages import getlang_by_name
 
-
 YOUTUBE_CACHE_DIR = os.path.join('chefdata', 'youtubecache')
 YOUTUBE_ID_REGEX = re.compile(r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/(watch\?v=|embed/|v/|.+\?v=)?(?P<youtube_id>[A-Za-z0-9\-=_]{11})')
+
 
 # List of languages not avialble at the le_utils
 UND_LANG = {
@@ -87,11 +89,12 @@ class ArvindVideo():
         self.description = description
         self.thumbnail = None
         self.language = language
+        self.license_common = False
 
     def __str__(self):
         return 'ArvindVideo (%s - %s - %s)' % (self.uid, self.url, self.title)
 
-    def download_info(self, download_dir="./", download=False):
+    def download_info(self, download_dir=None):
 
         match = YOUTUBE_ID_REGEX.match(self.url)
         if not match:
@@ -102,12 +105,14 @@ class ArvindVideo():
             os.mkdir(YOUTUBE_CACHE_DIR)
         vinfo_json_path = os.path.join(YOUTUBE_CACHE_DIR, youtube_id+'.json')
         # First try to get from cache:
+        vinfo = None
         if os.path.exists(vinfo_json_path):
             vinfo = json.load(open(vinfo_json_path))
+            print("Retrieving cached video information...")
         # else get using youtube_dl:
-        else:
+        if not vinfo:
+            print("Downloading {} from youtube...".format(self.url))
             ydl_options = {
-                'outtmpl': youtube_id,
                 'writethumbnail': True,
                 'no_warnings': True,
                 'continuedl': False,
@@ -116,22 +121,26 @@ class ArvindVideo():
                 # Note the format specification is important so we get mp4 and not taller than 480
                 'format': "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]"
             }
-            with youtube_dl.YoutubeDL(ydl_options) as ydl:
-                pp = pprint.PrettyPrinter()
+            try:
+                video = YouTubeResource(self.url, ydl_options)
+            except youtube_dl.utils.ExtractorError as e:
+                if "unavailable" in str(e):
+                    print("Video not found at URL: {}".format(self.url))
+                    return False
+
+            if video:
+                print("Downloading video to {}".format(download_dir))
                 try:
-                    ydl.add_default_info_extractors()
-                    # vinfo = ydl.extract_info(self.url, download=True)
-                    vinfo = ydl.extract_info(self.url, download=download)
+                    vinfo = video.download(base_path=download_dir)
                     # Save the remaining "temporary scraped values" of attributes with actual values
                     # from the video metadata.
                     json.dump(vinfo, open(vinfo_json_path, 'w'), indent=4, ensure_ascii=False, sort_keys=True)
+                except Exception as e:
+                    print(e)
+                    return False
 
-                except (youtube_dl.utils.DownloadError,
-                        youtube_dl.utils.ContentTooShortError,
-                        youtube_dl.utils.ExtractorError,) as e:
-                        print('==> Error downloading this video', e)
-                        # pp.pprint(e)
-                        return False
+            else:
+                return False
 
         self.uid = vinfo['id']  # video must have id because required to set youtube_id later
         self.title = vinfo.get('title', '')
