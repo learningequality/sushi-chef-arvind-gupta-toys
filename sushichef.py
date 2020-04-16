@@ -41,6 +41,7 @@ MULTI_LANGUAGE_TOPIC = ["russian", "french",]
 
 # This are the estimate total count of arvind gupta toys language contents
 TOTAL_ARVIND_LANG = 23
+SOURCE_ID_COUNTER = 0
 
 SINGLE_TOPIC = "single"
 STANDARD_TOPIC = "standard"
@@ -73,7 +74,9 @@ def clean_video_title(title, lang_obj):
 
 
 def generate_source_id(lang_code):
-    source_id = "arvind-{0}-{1}".format(lang_code, uuid.uuid4().hex[:16].lower())
+    global SOURCE_ID_COUNTER
+    SOURCE_ID_COUNTER += 1
+    source_id = "arvind-{0}-{1}".format(lang_code, SOURCE_ID_COUNTER)
     return source_id
 
 
