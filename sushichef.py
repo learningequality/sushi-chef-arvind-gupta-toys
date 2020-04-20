@@ -5,7 +5,6 @@ import pprint
 import requests
 import re
 import shutil
-import uuid
 
 from arvind import ArvindVideo, ArvindLanguage, YOUTUBE_CACHE_DIR
 
@@ -72,10 +71,10 @@ def clean_video_title(title, lang_obj):
     return clean_title
 
 
-def include_video_topic(topic_node, video_data, lang_obj, counter):
+def include_video_topic(topic_node, video_data, lang_obj):
     # Include video details to the parent topic node
-    video_id = video.uid
-    video_source_id = 'arvind-{0}-video-topic-{1}-{2}'.format(lang_obj.name, video_id, counter)
+    video_id = video_data.uid
+    video_source_id = 'arvind-video-{1}'.format(video_id)
     video_node = VideoNode(
         source_id=video_source_id, 
         title=clean_video_title(video.title, lang_obj), 
@@ -108,7 +107,6 @@ def download_video_topics(data, topic, topic_node, lang_obj):
     """
     pp = pprint.PrettyPrinter()
     topic_limit = 0
-    valid_video_counter = 0
     for vinfo in data[topic]:
         try:
             video = ArvindVideo(
@@ -121,8 +119,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
             if video.download_info(download_dir=download_path):
 
                 if video.license_common:
-                    valid_video_counter += 1
-                    include_video_topic(topic_node, video, lang_obj, valid_video_counter)
+                    include_video_topic(topic_node, video, lang_obj)
                 else:
                     save_skip_videos(video, topic, lang_obj)
             else:
@@ -136,18 +133,17 @@ def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
     # Create a topic for each languages
     pp = pprint.PrettyPrinter()
     data = arvind_contents[lang_obj.name]
-    standard_counter = 0
-    for topic_index in data:
 
+    for topic_index in data:
+        topic_name = topic_index
         if topic_type == STANDARD_TOPIC:
-            standard_counter += 1
-            source_id = 'arvind-{0}-child-topic-{1}'.format(lang_obj.name, standard_counter)
-            topic_node = TopicNode(title=topic_index, source_id=source_id)
-            download_video_topics(data, topic_index, topic_node, lang_obj)
+            source_id = 'arvind-{0}-child-topic'.format(topic_name)
+            topic_node = TopicNode(title=topic_name, source_id=source_id)
+            download_video_topics(data, topic_name, topic_node, lang_obj)
             main_topic.add_child(topic_node)
 
         if topic_type == SINGLE_TOPIC:
-            download_video_topics(data, topic_index, main_topic, lang_obj)
+            download_video_topics(data, topic_name, main_topic, lang_obj)
     return main_topic
 
 
