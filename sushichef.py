@@ -5,7 +5,6 @@ import pprint
 import requests
 import re
 import shutil
-import uuid
 
 from arvind import ArvindVideo, ArvindLanguage, YOUTUBE_CACHE_DIR
 
@@ -74,9 +73,8 @@ def clean_video_title(title, lang_obj):
 
 def include_video_topic(topic_node, video_data, lang_obj):
     # Include video details to the parent topic node
-    video = video_data
-    create_id = uuid.uuid4().hex[:12].lower()
-    video_source_id = str(video.uid)  # For YouTube imports, set source_id to the youtube_id
+    video_id = video_data.uid
+    video_source_id = 'arvind-video-{0}'.format(video_id)
     video_node = VideoNode(
         source_id=video_source_id, 
         title=clean_video_title(video.title, lang_obj), 
@@ -86,7 +84,7 @@ def include_video_topic(topic_node, video_data, lang_obj):
         license=get_license("CC BY-NC", copyright_holder=ARVIND),
         files=[
             YouTubeVideoFile(
-                youtube_id=video.uid,
+                youtube_id=video_id,
                 language=video.language
             )
         ])
@@ -136,16 +134,17 @@ def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
     # Create a topic for each languages
     pp = pprint.PrettyPrinter()
     data = arvind_contents[lang_obj.name]
-    for topic_index in data:
 
+    for topic_index in data:
+        topic_name = topic_index
         if topic_type == STANDARD_TOPIC:
-            source_id = lang_obj.code + '_' + topic_index
-            topic_node = TopicNode(title=topic_index, source_id=source_id)
-            download_video_topics(data, topic_index, topic_node, lang_obj)
+            source_id = 'arvind-child-topic-{0}'.format(topic_name)
+            topic_node = TopicNode(title=topic_name, source_id=source_id)
+            download_video_topics(data, topic_name, topic_node, lang_obj)
             main_topic.add_child(topic_node)
 
         if topic_type == SINGLE_TOPIC:
-            download_video_topics(data, topic_index, main_topic, lang_obj)
+            download_video_topics(data, topic_name, main_topic, lang_obj)
     return main_topic
 
 
@@ -246,9 +245,9 @@ def create_language_topic():
             lang_obj = get_language_details(lang_name.lower())
 
             if lang_obj != None:
-                language_source_id = "arvind_main_" + lang_obj.code
                 lang_name = lang_obj.name
                 lang_name_lower = lang_name.lower()
+                language_source_id = 'arvind-parent-topic-{0}'.format(lang_name_lower)
                 get_language_data = list(arvind_languages[language_next_int])
                 data_contents = { lang_name: create_language_data(get_language_data, lang_obj) }
                 language_topic = TopicNode(title=lang_name.capitalize(), source_id=language_source_id)
@@ -274,11 +273,9 @@ def create_language_topic():
                         current_lang = get_language_details(lang.lower())
 
                         if current_lang != None:
-                            topic_type = SINGLE_TOPIC
-                            parent_source_id = "arvind_main_" + lang.lower()
+                            parent_source_id = 'arvind-parent-topic-{0}'.format(current_lang.name)
                             parent_topic = TopicNode(title=lang.capitalize(), source_id=parent_source_id)
                             data_dic = {current_lang.name: {"": lang_data[lang]}}
-
                             topic_type = SINGLE_TOPIC
                             generate_child_topics(data_dic, parent_topic, current_lang, topic_type)
                             main_topic_list.append(parent_topic)
