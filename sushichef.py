@@ -74,7 +74,7 @@ def clean_video_title(title, lang_obj):
 def include_video_topic(topic_node, video_data, lang_obj):
     # Include video details to the parent topic node
     video_id = video_data.uid
-    video_source_id = 'arvind-video-{1}'.format(video_id)
+    video_source_id = 'arvind-video-{0}'.format(video_id)
     video_node = VideoNode(
         source_id=video_source_id, 
         title=clean_video_title(video.title, lang_obj), 
@@ -137,7 +137,7 @@ def generate_child_topics(arvind_contents, main_topic, lang_obj, topic_type):
     for topic_index in data:
         topic_name = topic_index
         if topic_type == STANDARD_TOPIC:
-            source_id = 'arvind-{0}-child-topic'.format(topic_name)
+            source_id = 'arvind-child-topic-{0}'.format(topic_name)
             topic_node = TopicNode(title=topic_name, source_id=source_id)
             download_video_topics(data, topic_name, topic_node, lang_obj)
             main_topic.add_child(topic_node)
@@ -272,7 +272,7 @@ def create_language_topic():
                         current_lang = get_language_details(lang.lower())
 
                         if current_lang != None:
-                            parent_source_id = 'arvind-{0}-parent-topic'.format(current_lang.name)
+                            parent_source_id = 'arvind-parent-topic-{0}'.format(current_lang.name)
                             parent_topic = TopicNode(title=lang.capitalize(), source_id=parent_source_id)
                             data_dic = {current_lang.name: {"": lang_data[lang]}}
                             topic_type = SINGLE_TOPIC
