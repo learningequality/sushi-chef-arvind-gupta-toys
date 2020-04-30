@@ -79,7 +79,6 @@ class ArvindVideo():
     language = ''
     thumbnail = ''  # local path to thumbnail image
     license = ''
-    download_dir = './'
     license_common = False
 
     def __init__(self, uid=0, url='', title='', description='', language='',):
@@ -94,7 +93,7 @@ class ArvindVideo():
     def __str__(self):
         return 'ArvindVideo (%s - %s - %s)' % (self.uid, self.url, self.title)
 
-    def download_info(self, download_dir=None):
+    def download_info(self):
 
         match = YOUTUBE_ID_REGEX.match(self.url)
         if not match:
@@ -112,26 +111,16 @@ class ArvindVideo():
         # else get using youtube_dl:
         if not vinfo:
             print("Downloading {} from youtube...".format(self.url))
-            ydl_options = {
-                'writethumbnail': True,
-                'no_warnings': True,
-                'continuedl': False,
-                'restrictfilenames': True,
-                'quiet': False,
-                # Note the format specification is important so we get mp4 and not taller than 480
-                'format': "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]"
-            }
             try:
-                video = YouTubeResource(self.url, ydl_options)
+                video = YouTubeResource(self.url)
             except youtube_dl.utils.ExtractorError as e:
                 if "unavailable" in str(e):
                     print("Video not found at URL: {}".format(self.url))
                     return False
 
             if video:
-                print("Downloading video to {}".format(download_dir))
                 try:
-                    vinfo = video.download(base_path=download_dir)
+                    vinfo = video.get_resource_info()
                     # Save the remaining "temporary scraped values" of attributes with actual values
                     # from the video metadata.
                     json.dump(vinfo, open(vinfo_json_path, 'w'), indent=4, ensure_ascii=False, sort_keys=True)
