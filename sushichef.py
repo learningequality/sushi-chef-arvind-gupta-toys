@@ -77,15 +77,15 @@ def include_video_topic(topic_node, video_data, lang_obj):
     video_source_id = 'arvind-video-{0}'.format(video_id)
     video_node = VideoNode(
         source_id=video_source_id, 
-        title=clean_video_title(video.title, lang_obj), 
-        description=video.description,
+        title=clean_video_title(video_data.title, lang_obj), 
+        description=video_data.description,
         author=ARVIND,
-        thumbnail=video.thumbnail,
+        thumbnail=video_data.thumbnail,
         license=get_license("CC BY-NC", copyright_holder=ARVIND),
         files=[
             YouTubeVideoFile(
                 youtube_id=video_id,
-                language=video.language
+                language=video_data.language
             )
         ])
     topic_node.add_child(video_node)
