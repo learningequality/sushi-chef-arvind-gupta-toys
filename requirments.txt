@@ -1,4 +1,1 @@
-beautifulsoup4>=4.8.0
-requests>=2.22.0
-ricecooker>=0.6.41
-youtube-dl>=2019.9.12.1
+ricecooker>=0.6.43
