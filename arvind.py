@@ -107,8 +107,12 @@ class ArvindVideo():
         vinfo = None
         if os.path.exists(vinfo_json_path):
             vinfo = json.load(open(vinfo_json_path))
-            print("Retrieving cached video information...")
-        # else get using youtube_dl:
+            if not vinfo:
+                # the json data for "Video unavailable" is `null` so can skip them
+                return False
+            print("Using cached video info for youtube_id", youtube_id)
+
+        # else get using YouTubeResource
         if not vinfo:
             print("Downloading {} from youtube...".format(self.url))
             try:
