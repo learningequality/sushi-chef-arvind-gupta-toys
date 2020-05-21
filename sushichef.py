@@ -133,7 +133,7 @@ def download_video_topics(data, topic, topic_node, lang_obj):
                 language=lang_obj.code)
 
             if video.download_info():
-                if True:  # video.license_common:  May 21(Ivan decision): include ALL videos
+                if video.license_common:
                     video_source_id = 'arvind-video-{0}'.format(video.uid)
                     if video_source_id not in video_source_ids:
                         include_video_topic(topic_node, video, lang_obj)
