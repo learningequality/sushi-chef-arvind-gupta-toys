@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
+import json
 import os
 import requests
 import re
 import shutil
+import sys
 
-from arvind import ArvindVideo, ArvindLanguage, YOUTUBE_CACHE_DIR
+from arvind import ArvindVideo, ArvindLanguage, YOUTUBE_CACHE_DIR, YOUTUBE_ID_REGEX
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
@@ -26,6 +28,8 @@ DOWNLOADS_PATH = os.path.join(ROOT_DIR_PATH, "downloads")
 DOWNLOADS_VIDEOS_PATH = os.path.join(DOWNLOADS_PATH, "videos/")
 
 SKIP_VIDEOS_PATH = os.path.join(ROOT_DIR_PATH, "skip_videos.txt")
+
+CACHE_SKIP_VIDEOS_PATH = os.path.join(ROOT_DIR_PATH, "cache_skip_videos.json")
 
 # These are the languages that has no sub topics on its videos.
 SINGLE_TOPIC_LANGUAGES = [
@@ -51,6 +55,8 @@ SINGLE_TOPIC_LANGUAGES = [
 # List of multiple languages on its topics
 MULTI_LANGUAGE_TOPIC = ["russian", "french",]
 
+CACHE_SKIP_VIDEO_LIST = []
+
 # This are the estimate total count of arvind gupta toys language contents
 TOTAL_ARVIND_LANG = 23
 
@@ -60,6 +66,8 @@ MULTI_LANGUAGE = "multi"
 
 YOUTUBE_DOMAINS = ["youtu.be", "youtube.com"]
 
+# Include this at script argv to delete CACHE_SKIP_VIDEOS_PATH
+CLEAR_SKIP_CACHE = "--clear-skip-cache"
 
 DEBUG_MODE = True  # Print extra debug info durig the chef run (disable in prod)
 
@@ -87,6 +95,28 @@ def clean_video_title(title, lang_obj):
         print('Error cleaning this video title: ', clean_title)
 
     return clean_title
+
+
+def load_skip_videos():
+    data = []
+    if not os.path.exists(CACHE_SKIP_VIDEOS_PATH):
+        return data
+    with open(CACHE_SKIP_VIDEOS_PATH) as json_file:
+        try:
+            data = json.load(json_file)
+            if type(data) == type([]) :
+                return data
+        except Exception as e:
+            print("Error failed to load cache video", e)
+    return data          
+
+
+def cache_skip_videos():
+    global CACHE_SKIP_VIDEO_LIST
+    skip_videos = load_skip_videos()
+    with open(CACHE_SKIP_VIDEOS_PATH, 'w') as outfile:
+        data = CACHE_SKIP_VIDEO_LIST + skip_videos
+        json.dump(data, outfile)
 
 
 def include_video_topic(topic_node, video_data, lang_obj):
@@ -124,26 +154,35 @@ def download_video_topics(data, topic, topic_node, lang_obj):
     """
     Scrape, collect, and download the videos and their thumbnails.
     """
+    global CACHE_SKIP_VIDEO_LIST
     video_source_ids = []
     for vinfo in data[topic]:
         try:
+            video_url = vinfo['video_url']
             video = ArvindVideo(
-                url=vinfo['video_url'], 
+                url=video_url, 
                 title=vinfo['video_title'], 
                 language=lang_obj.code)
 
-            if video.download_info():
-                if video.license_common:
-                    video_source_id = 'arvind-video-{0}'.format(video.uid)
-                    if video_source_id not in video_source_ids:
-                        include_video_topic(topic_node, video, lang_obj)
-                        video_source_ids.append(video_source_id)
+            match = YOUTUBE_ID_REGEX.match(video_url)
+            if match:
+                youtube_id = match.group('youtube_id')
+                skip_videos = load_skip_videos()
+                if not youtube_id in skip_videos: 
+                    if video.download_info():
+                        if video.license_common:
+                            video_source_id = 'arvind-video-{0}'.format(video.uid)
+                            if video_source_id not in video_source_ids:
+                                include_video_topic(topic_node, video, lang_obj)
+                                video_source_ids.append(video_source_id)
+                            else:
+                                print('Skipping duplicate video: ' + str(vinfo['video_url']))
+                        else:
+                            save_skip_videos(video, topic, lang_obj)
+                            CACHE_SKIP_VIDEO_LIST.append(video.uid)
                     else:
-                        print('Skipping duplicate video: ' + str(vinfo['video_url']))
-                else:
-                    save_skip_videos(video, topic, lang_obj)
-            else:
-                save_skip_videos(video, topic, lang_obj)
+                        save_skip_videos(video, topic, lang_obj)
+                        CACHE_SKIP_VIDEO_LIST.append(video.uid)
 
         except Exception as e:
             print('Error downloading this video:', e)
@@ -321,6 +360,7 @@ def create_language_topic():
         language_next_int += 4
         loop_couter += 1
 
+    cache_skip_videos()
     return main_topic_list
 
 
@@ -357,11 +397,20 @@ class ArvindChef(SushiChef):
         return channel
 
 
+def check_arg():
+    """Remove cache skip videos if CLEAR_SKIP_CACHE in argv"""
+    args_val = sys.argv
+    if CLEAR_SKIP_CACHE in args_val:
+        args_val.remove(CLEAR_SKIP_CACHE)
+        if os.path.exists(CACHE_SKIP_VIDEOS_PATH):
+            os.remove(CACHE_SKIP_VIDEOS_PATH)
+
+
 if __name__ == "__main__":
     """
     Run this script on the command line using:
         python sushichef.py -v --reset --token=YOURTOKENHERE9139139f3a23232
     """
-
+    check_arg()
     chef = ArvindChef()
     chef.main()

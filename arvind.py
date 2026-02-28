@@ -100,6 +100,7 @@ class ArvindVideo():
             print('==> URL ' + self.url + ' does not match YOUTUBE_ID_REGEX')
             return False
         youtube_id = match.group('youtube_id')
+        self.uid = youtube_id  # video must have id because required to set youtube_id later
         if not os.path.isdir(YOUTUBE_CACHE_DIR):
             os.mkdir(YOUTUBE_CACHE_DIR)
         vinfo_json_path = os.path.join(YOUTUBE_CACHE_DIR, youtube_id+'.json')
@@ -135,7 +136,6 @@ class ArvindVideo():
             else:
                 return False
 
-        self.uid = vinfo['id']  # video must have id because required to set youtube_id later
         self.title = vinfo.get('title', '')
         self.description = vinfo.get('description', '')
         if not vinfo['license']:
